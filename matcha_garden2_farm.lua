@@ -13,6 +13,7 @@ local Drawing  = Drawing
 
 local players   = game:GetService("Players")
 local workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player    = players.LocalPlayer
 
 
@@ -85,9 +86,9 @@ local function feat(key, label, kind)
 end
 
 feat("AutoHarvest", "AUTO HARVEST",     "toggle")
-feat("AutoSell",    "AUTO SELL (SOON)", "soon")
+feat("AutoBuy",     "AUTO BUY",         "toggle")
 feat("AutoLoot",    "AUTO LOOT",        "toggle")
-feat("AutoSteal",   "AUTO STEAL",       "toggle")
+feat("AutoSteal",   "AUTO STEAL (SOON)", "soon")
 feat("ForceBuy",    "BUY",              "action")
 
 local function fVal(key)
@@ -278,6 +279,26 @@ local function getPhase()
 end
 
 local stealCache = {}
+local function isOwnerNear(p)
+  local pSp = p:FindFirstChild("SpawnPoint")
+  if not pSp then return true end
+  local ok, pPos = pcall(function() return pSp.Position end)
+  if not ok then return true end
+  for _, pl in ipairs(players:GetPlayers()) do
+    if pl ~= player then
+      local char = pl.Character
+      if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+          local ok2, dist = pcall(function() return (hrp.Position - pPos).Magnitude end)
+          if ok2 and dist < 25 then return true end
+        end
+      end
+    end
+  end
+  return false
+end
+
 local function scanStealCache()
   stealCache = {}
   if not gardens then return end
@@ -286,7 +307,7 @@ local function scanStealCache()
   local sp = myPlot:FindFirstChild("SpawnPoint")
   local spawnCF = sp and pcall(function() return sp.CFrame end) and sp.CFrame or nil
   for _, p in ipairs(gardens:GetChildren()) do
-    if p ~= myPlot then
+    if p ~= myPlot and not isOwnerNear(p) then
       local plants = p:FindFirstChild("Plants")
       if plants then
         for _, plant in ipairs(plants:GetChildren()) do
@@ -335,6 +356,150 @@ local function doSteal()
   print("[Steal] +" .. #stealCache .. " (total " .. stolenCount .. ")")
 end
 
+-- Auto Buy
+local autoBuyRunning = false
+local autoBuyThread = nil
+
+local function num(t)
+  if not t or type(t) ~= "string" then return 0 end
+  local k = t:match("(%d+%.?%d*)K")
+  if k then return math.floor(tonumber(k) * 1000) end
+  local n = t:match("%d+")
+  return n and tonumber(n) or 0
+end
+
+local function coins()
+  local ok, t = pcall(function() return player.PlayerGui.HUD.Currencies.CoinsCounter.TextLabel.Text end)
+  return ok and num(t) or 0
+end
+
+local function stk(mf)
+  local ok, t = pcall(function() return mf.Stock_Text.Text end)
+  return ok and num(t) or 0
+end
+
+local function prix(mf)
+  local ok, t = pcall(function() return mf.Cost_Text.Text end)
+  return ok and num(t) or 0
+end
+
+local function gClk(o)
+  if not o then return end
+  local p, s = o.AbsolutePosition, o.AbsoluteSize
+  mousemoveabs(p.X + s.X / 2, p.Y + s.Y / 2)
+  task.wait(0.05); mouse1click()
+end
+
+local function rScrl(sh)
+  local ok = pcall(function() sh.CanvasPosition = Vector2.new(0, 0) end)
+  if not ok then
+    local p, s = sh.AbsolutePosition, sh.AbsoluteSize
+    if s.X > 0 and s.Y > 0 then
+      mousemoveabs(p.X + s.X / 2, p.Y + s.Y / 2)
+      task.wait(0.1)
+      for _ = 1, 20 do mousescroll(10); task.wait(0.05) end
+    end
+  end
+end
+
+local function sclv(sh, it)
+  pcall(function()
+    local y = sh.CanvasPosition.Y + (it.AbsolutePosition.Y - sh.AbsolutePosition.Y)
+    sh.CanvasPosition = Vector2.new(0, math.max(0, y))
+  end)
+  task.wait(0.15)
+end
+
+local function ferm(fr)
+  if not fr then return end
+  local ok, b = pcall(function() return fr.Header.ExitButton end)
+  if ok and b then gClk(b) end
+end
+
+local function attRst()
+  local ok, v = pcall(function() return ReplicatedStorage.StockValues.SeedShop.UnixNextRestock end)
+  if not ok or not v then
+    local t = 0; while t < 300 and autoBuyRunning do task.wait(1); t = t + 1 end
+    return
+  end
+  local nxt = v.Value
+  local rst = nxt - os.time()
+  if rst > 0 then
+    safeNotify("Restock in " .. math.floor(rst / 60) .. "m " .. rst % 60 .. "s", "AutoBuy", 5)
+    local t = 0; while t < rst + 2 and autoBuyRunning do task.wait(1); t = t + 1 end
+  end
+  while v.Value == nxt and autoBuyRunning do task.wait(0.5) end
+  if autoBuyRunning then safeNotify("Restock! Restarting...", "AutoBuy", 3); task.wait(2) end
+end
+
+local function achtt(fr)
+  local tot = 0
+  for _, nm in pairs({"NormalShop", "ExclusiveShop"}) do
+    if not autoBuyRunning then return tot end
+    local sh = fr:FindFirstChild(nm)
+    if not sh then continue end
+    local ok, bb = pcall(function() return sh.Sheckles_Shelf.Main_Frame.Buttons.BuyButton end)
+    if not ok or not bb then continue end
+    task.wait(0.3); rScrl(sh)
+    for _, it in pairs(sh:GetChildren()) do
+      if not autoBuyRunning then ferm(fr); return tot end
+      if it.Name == "Sheckles_Shelf" or it.Name == "Robux_Shelf" or it.Name == "ItemTemplate" then continue end
+      local mf = it:FindFirstChild("Main_Frame")
+      if not mf then continue end
+      local sb = mf:FindFirstChild("TextButton")
+      if not sb then continue end
+      sclv(sh, it); gClk(sb); task.wait(0.1)
+      if not autoBuyRunning then ferm(fr); return tot end
+      local px, sk = prix(mf), stk(mf)
+      if px <= 0 or sk <= 0 then continue end
+      if coins() < px then ferm(fr); safeNotify("Not enough coins! " .. tot .. " seeds bought.", "AutoBuy", 5); return tot end
+      for _ = 1, sk do
+        if not autoBuyRunning then ferm(fr); return tot end
+        if coins() < px then ferm(fr); safeNotify("Not enough coins! " .. tot .. " seeds bought.", "AutoBuy", 5); return tot end
+        gClk(bb); tot = tot + 1; task.wait(0.03)
+      end
+    end
+  end
+  ferm(fr); safeNotify("Cycle done! " .. tot .. " seeds bought.", "AutoBuy", 5)
+  return tot
+end
+
+local function ouvr()
+  local sam = workspace:FindFirstChild("NPCS") and workspace.NPCS:FindFirstChild("Sam")
+  if not sam or not sam.PrimaryPart then return nil end
+  local sp = sam.PrimaryPart.Position
+  local hrp = getHRP()
+  if not hrp then return nil end
+  hrp.CFrame = CFrame.new(sp.X, sp.Y + 1, sp.Z + 3)
+  local fr, att = nil, 0
+  repeat
+    if not autoBuyRunning then return nil end
+    att = att + 1
+    for _ = 1, 3 do keypress(VK_E); keyrelease(VK_E) end
+    task.wait(0.3)
+    local sg = player.PlayerGui:FindFirstChild("SeedShop")
+    if sg then fr = sg:FindFirstChild("Frame") end
+    if not fr then
+      hrp.CFrame = CFrame.new(sp.X, sp.Y + 1, sp.Z + 3)
+    end
+  until fr ~= nil or att >= 3
+  task.wait(0.5)
+  return fr
+end
+
+local function autoBuyLoop()
+  safeNotify("AutoBuy started!", "AutoBuy", 3)
+  while autoBuyRunning do
+    local fr = ouvr()
+    if not autoBuyRunning then break end
+    if fr then achtt(fr); if not autoBuyRunning then break end; attRst()
+    else task.wait(5) end
+  end
+  autoBuyRunning = false
+  autoBuyThread = nil
+  safeNotify("AutoBuy stopped!", "AutoBuy", 3)
+end
+
 -- Farm loop
 task.spawn(function()
   print("[Farm] Waiting 3s before starting...")
@@ -367,7 +532,6 @@ task.spawn(function()
         if sp then tp(sp.CFrame * CFrame.new(0, 3, 0)) end
       end
       prevHarvest = harvesting
-      local selling = fVal("AutoSell")
       if harvesting then
         scanHarvestCache(plot); doHarvest()
         harvestCycles = harvestCycles + 1
@@ -379,7 +543,13 @@ task.spawn(function()
           return
         end
       end
-      if selling and false then doSell() end
+      if fVal("AutoBuy") and not autoBuyRunning then
+        autoBuyRunning = true
+        autoBuyThread = task.spawn(autoBuyLoop)
+      elseif not fVal("AutoBuy") and autoBuyRunning then
+        autoBuyRunning = false
+        if autoBuyThread then task.cancel(autoBuyThread); autoBuyThread = nil end
+      end
       if fVal("AutoLoot") then doLoot() end
       if fVal("AutoSteal") and getPhase() == "Night" then doSteal() end
     end
@@ -437,7 +607,7 @@ local function Render()
 
   local hrp = getHRP()
   local yStr = hrp and tostring(math.floor(hrp.Position.Y)) or "?"
-  StatusTxt.Text = "Y:" .. yStr .. " | Loot:" .. lootCount .. " Steal:" .. stolenCount .. " | " .. currentPhase
+  StatusTxt.Text = "Y:" .. yStr .. " | Loot:" .. lootCount .. " Steal:" .. stolenCount .. " | Buy:" .. (autoBuyRunning and "ON" or "OFF") .. " | " .. currentPhase
   StatusTxt.Position = Vector2.new(uiPos.X + 10, uiPos.Y + uiSize.Y - 16)
 end
 
@@ -491,10 +661,12 @@ end)
 
 _G.MatchaCleanup = function()
   ScriptActive = false
+  autoBuyRunning = false
+  if autoBuyThread then task.cancel(autoBuyThread); autoBuyThread = nil end
   pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
   for _, obj in ipairs(drawObjs) do pcall(function() obj:Remove() end) end
   print("[Farm] Cleanup done")
 end
 
 safeNotify("Farm Hub loaded!", "Garden 2", 3)
-print("[Farm] AUTO HARVEST + AUTO SELL + AUTO LOOT + AUTO STEAL ready")
+print("[Farm] AUTO HARVEST + AUTO BUY + AUTO LOOT + AUTO STEAL ready")
