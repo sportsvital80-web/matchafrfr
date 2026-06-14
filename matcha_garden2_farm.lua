@@ -167,7 +167,7 @@ local function doHarvest()
     if hp and hp.Parent then
       local ok, cf = pcall(function() return hp.CFrame end)
       if ok and cf then
-        local targetPos = cf * CFrame.new(0, 3, 0)
+        local targetPos = cf * CFrame.new(0, 1, 0)
         local startCF = hrp.CFrame
         for t = 0, 1, 0.1 do
           if not fVal("AutoHarvest") then break end
@@ -175,9 +175,9 @@ local function doHarvest()
           task.wait()
         end
         hrp.CFrame = targetPos
-        for _ = 1, 5 do
-          keypress(VK_E); keyrelease(VK_E)
-        end
+        keypress(VK_E)
+        task.wait()
+        keyrelease(VK_E)
       end
     end
   end
@@ -315,7 +315,7 @@ local function doSteal()
     if not fVal("AutoSteal") then break end
     local ok, cf = pcall(function() return target.part.CFrame end)
     if ok and cf then
-      local targetPos = cf * CFrame.new(0, 3, 0)
+      local targetPos = cf * CFrame.new(0, 1, 0)
       local startCF = hrp.CFrame
       for t = 0, 1, 0.1 do
         if not fVal("AutoSteal") then break end
@@ -323,9 +323,9 @@ local function doSteal()
         task.wait()
       end
       hrp.CFrame = targetPos
-      for _ = 1, 5 do
-        keypress(VK_E); keyrelease(VK_E)
-      end
+      keypress(VK_E)
+      task.wait()
+      keyrelease(VK_E)
       stolenCount = stolenCount + 1
       if i % 2 == 0 and target.spawn then
         hrp.CFrame = target.spawn * CFrame.new(0, 3, 0)
