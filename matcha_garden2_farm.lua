@@ -162,28 +162,25 @@ end
 local function doHarvest()
   local hrp = getHRP()
   if not hrp then return end
-  for i, hp in ipairs(harvestCache) do
+  for _, hp in ipairs(harvestCache) do
     if not fVal("AutoHarvest") then break end
     if hp and hp.Parent then
       local ok, cf = pcall(function() return hp.CFrame end)
       if ok and cf then
-        local standPos = cf * CFrame.new(0, 3, 0)
-        hrp.CFrame = standPos
-        if i == 1 then
-          task.wait(0.4)
-          keypress(VK_E)
-        else
-          task.wait(0.05)
-        end
-        for _ = 1, 6 do
+        local targetPos = cf * CFrame.new(0, 3, 0)
+        local startCF = hrp.CFrame
+        for t = 0, 1, 0.1 do
           if not fVal("AutoHarvest") then break end
-          hrp.CFrame = standPos
-          task.wait(0.01)
+          hrp.CFrame = startCF:Lerp(targetPos, t)
+          task.wait()
+        end
+        hrp.CFrame = targetPos
+        for _ = 1, 5 do
+          keypress(VK_E); keyrelease(VK_E)
         end
       end
     end
   end
-  keyrelease(VK_E)
 end
 
 local function doSell()
@@ -318,18 +315,16 @@ local function doSteal()
     if not fVal("AutoSteal") then break end
     local ok, cf = pcall(function() return target.part.CFrame end)
     if ok and cf then
-      local standPos = cf * CFrame.new(0, 3, 0)
-      hrp.CFrame = standPos
-      if i == 1 then
-        task.wait(0.4)
-        keypress(VK_E)
-      else
-        task.wait(0.05)
-      end
-      for _ = 1, 6 do
+      local targetPos = cf * CFrame.new(0, 3, 0)
+      local startCF = hrp.CFrame
+      for t = 0, 1, 0.1 do
         if not fVal("AutoSteal") then break end
-        hrp.CFrame = standPos
-        task.wait(0.01)
+        hrp.CFrame = startCF:Lerp(targetPos, t)
+        task.wait()
+      end
+      hrp.CFrame = targetPos
+      for _ = 1, 5 do
+        keypress(VK_E); keyrelease(VK_E)
       end
       stolenCount = stolenCount + 1
       if i % 2 == 0 and target.spawn then
@@ -337,7 +332,6 @@ local function doSteal()
       end
     end
   end
-  keyrelease(VK_E)
   print("[Steal] +" .. #stealCache .. " (total " .. stolenCount .. ")")
 end
 
