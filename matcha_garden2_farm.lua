@@ -80,16 +80,16 @@ local SEP = D("Square", {Size = Vector2.new(uiS.X - 24, SH), Color = C_SP, Fille
 local STX = D("Text", {Text = "", Size = 11, Color = C_DM, Outline = true, Visible = true, Font = Drawing.Fonts.System})
 
 local F = {}
-local function feat(key, label, kind)
-  local f = {key=key, label=label, kind=kind, value=false}
+local function feat(key, label, kind, hotkey)
+  local f = {key=key, label=label, kind=kind, value=false, hotkey=hotkey}
   table.insert(F, f)
   return f
 end
 
-feat("AutoHarvest", "AUTO HARVEST",     "toggle")
-feat("AutoBuy",     "AUTO BUY",         "toggle")
-feat("AutoLoot",    "AUTO LOOT",        "toggle")
-feat("AutoSell",     "AUTO SELL",         "toggle")
+feat("AutoHarvest", "AUTO HARVEST [1]", "toggle", 0x31)
+feat("AutoBuy",     "AUTO BUY [2]",     "toggle", 0x32)
+feat("AutoLoot",    "AUTO LOOT [3]",    "toggle", 0x33)
+feat("AutoSell",    "AUTO SELL [4]",    "toggle", 0x34)
 feat("ForceBuy",    "BUY",              "action")
 
 local function fVal(key)
@@ -153,7 +153,7 @@ local function doHarvest()
           hrp.CFrame = sc:Lerp(tp, t); task.wait()
         end
         if countItems() < INV_MAX then
-          hrp.CFrame = tp; keypress(VK_E); task.wait(); keyrelease(VK_E)
+          hrp.CFrame = tp; keypress(VK_E); task.wait(0.10); keyrelease(VK_E)
         end
       end
     end
@@ -430,8 +430,11 @@ local function autoSellLoop()
   while asRun and fVal("AutoSell") do
     local hrp = getHRP()
     if hrp and sellTp then
-      hrp.CFrame = CFrame.new(sellTp.Position.X, sellTp.Position.Y + 3, sellTp.Position.Z)
-      task.wait(0.5)
+      local sellCF = CFrame.new(sellTp.Position.X, sellTp.Position.Y, sellTp.Position.Z)
+      hrp.CFrame = sellCF
+      task.wait(0.3)
+      hrp.CFrame = sellCF
+      task.wait(0.3)
       keypress(VK_E); task.wait(0.2); keyrelease(VK_E)
       task.wait(0.8)
       for _ = 1, 20 do mousescroll(120); task.wait(0.02) end
@@ -442,6 +445,9 @@ local function autoSellLoop()
       task.wait(0.3)
       moveMouse(1776, 172)
       task.wait(0.05); mouse1click(); task.wait(0.3)
+      moveMouse(960, 530)
+      task.wait(0.2)
+      for _ = 1, 22 do mousescroll(-120); task.wait(0.02) end
       break
     end
     task.wait(1)
@@ -491,7 +497,7 @@ task.spawn(function()
           harvesting = false
           pcall(function() cam.CameraType = Enum.CameraType.Custom end)
           if abRun then abRun = false; if abTh then task.cancel(abTh); abTh = nil end end
-          if fVal("AutoSell") then
+          if fVal("AutoSell") and not asRun then
             asRun = true; asTh = task.spawn(autoSellLoop)
             while asRun and fVal("AutoSell") do task.wait(0.5) end
             asRun = false
@@ -513,7 +519,7 @@ task.spawn(function()
           end
         end
       end
-      if fVal("AutoBuy") and not abRun then
+      if fVal("AutoBuy") and not abRun and not soldCycle then
         abRun = true
         abTh = task.spawn(autoBuyLoop)
       elseif not fVal("AutoBuy") and abRun then
@@ -577,7 +583,8 @@ local function Render()
       local ih = (hov == s)
       local lc = C_TX
       if f.kind == "action" then lc = C_AC elseif f.kind == "soon" then lc = C_SN elseif f.value then lc = C_A end
-      local txt = "   " .. f.label; if f.kind == "action" then txt = ">> " .. f.label end
+      local txt = "   " .. f.label
+      if f.kind == "action" then txt = ">> " .. f.label end
       SL[s].Text = txt; SL[s].Position = Vector2.new(x0 + 16, yy)
       if ih then
         if f.kind == "action" then SL[s].Color = C0(255, 210, 120)
@@ -680,7 +687,7 @@ task.spawn(function()
             if f.kind == "toggle" then
               f.value = not f.value
               print("[UI] TOGGLED: " .. f.key .. " = " .. tostring(f.value))
-              safeNotify(f.label .. ": " .. (f.value and "ON" or "OFF"), "Toggle", 2)
+              safeNotify(f.label:match("^(.-)%s*%[") .. ": " .. (f.value and "ON" or "OFF"), "Toggle", 2)
             elseif f.kind == "soon" then safeNotify("Coming soon!", "WIP", 2)
             elseif f.kind == "action" then
               print("[UI] ACTION: " .. f.key)
@@ -745,6 +752,26 @@ task.spawn(function()
         if petScroll + 4 < #ALL_PETS then petScroll = petScroll + 1; task.wait(0.12) end
       elseif activeTab == "pets" and iskeypressed(0x26) then
         if petScroll > 0 then petScroll = petScroll - 1; task.wait(0.12) end
+      end
+
+      for _, f in ipairs(F) do
+        if f.hotkey and iskeypressed(f.hotkey) and f.kind == "toggle" and f.value then
+          f.value = false
+          print("[UI] KEY OFF: " .. f.key)
+          safeNotify(f.label:match("^(.-)%s*%[") .. " OFF", "Hotkey", 2)
+          task.wait(0.3)
+        end
+      end
+
+      if iskeypressed(0x35) then
+        for _, f in ipairs(F) do
+          if f.kind == "toggle" and f.value then
+            f.value = false
+            print("[UI] KEY ALL OFF: " .. f.key)
+          end
+        end
+        safeNotify("ALL OFF (except AutoPet)", "Hotkey [5]", 2)
+        task.wait(0.3)
       end
     end)
 
