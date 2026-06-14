@@ -88,6 +88,7 @@ feat("AutoHarvest", "AUTO HARVEST",     "toggle")
 feat("AutoSell",    "AUTO SELL (SOON)", "soon")
 feat("AutoLoot",    "AUTO LOOT",        "toggle")
 feat("AutoSteal",   "AUTO STEAL",       "toggle")
+feat("ForceBuy",    "BUY",              "action")
 
 local function fVal(key)
   for _, f in ipairs(F) do if f.key == key then return f.value end end
@@ -324,7 +325,7 @@ local function doSteal()
       end
       keyrelease(VK_E)
       stolenCount = stolenCount + 1
-      if i % 20 == 0 and target.spawn then
+      if i % 2 == 0 and target.spawn then
         hrp.CFrame = target.spawn * CFrame.new(0, 3, 0)
       end
     end
@@ -383,7 +384,28 @@ task.spawn(function()
   end
 end)
 
-local ActionMap = {}
+local function forceBuyNow()
+  local hrp = getHRP()
+  if not hrp then safeNotify("No character", "Error", 2); return end
+  local savedPos = hrp.CFrame
+  local seeds = workspace:FindFirstChild("Teleports") and workspace.Teleports:FindFirstChild("Seeds")
+  if not seeds or not seeds:IsA("BasePart") then safeNotify("Seeds teleport not found", "Error", 2); return end
+  local ok, cf = pcall(function() return seeds.CFrame end)
+  if not ok or not cf then safeNotify("Bad CFrame", "Error", 2); return end
+  hrp.CFrame = cf
+  for _ = 1, 5 do
+    keypress(VK_E)
+    task.wait(0.02)
+    keyrelease(VK_E)
+    task.wait(0.02)
+  end
+  hrp.CFrame = savedPos
+  safeNotify("Buy menu opened", "BUY", 2)
+end
+
+local ActionMap = {
+  ForceBuy = forceBuyNow,
+}
 
 local function Render()
   Shadow.Position  = Vector2.new(uiPos.X - 3, uiPos.Y - 3)
