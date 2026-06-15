@@ -45,6 +45,18 @@ local StatTxt = D("Text", {Text = "Detecting...", Size = 11, Color = Color3.from
 local wheatOn = false
 local sellOn = false
 
+local function smoothFly(root, target, speed)
+    speed = speed or 0.15
+    local start = root.CFrame
+    local t = 0
+    while t < 1 and ScriptActive do
+        t = math.min(1, t + speed)
+        root.CFrame = start:Lerp(target, t)
+        task.wait(0.016)
+    end
+    root.CFrame = target
+end
+
 local function findMyPlot()
     local plots = workspace:FindFirstChild("MilitaryMap") and workspace.MilitaryMap:FindFirstChild("PlayerPlots")
     if not plots then print("[Wheat] No PlayerPlots found"); return nil end
@@ -150,30 +162,13 @@ end
 local sellTP = nil
 local sellFolder = workspace:FindFirstChild("Teleports")
 if sellFolder then
-    print("[Wheat] Teleports folder found")
-    for _, child in ipairs(sellFolder:GetChildren()) do
-        print("[Wheat]   " .. child.Name .. " (" .. child.ClassName .. ")")
-    end
     sellTP = sellFolder:FindFirstChild("sell") or sellFolder:FindFirstChild("Sell")
-    if not sellTP then
-        for _, child in ipairs(sellFolder:GetChildren()) do
-            if child.Name:lower():find("sell") then sellTP = child; break end
-        end
-    end
-else
-    print("[Wheat] No Teleports folder!")
 end
 if sellTP then
     local ok, cf = pcall(function() return sellTP.CFrame end)
-    if ok and cf then
-        sellTP = CFrame.new(cf.X, cf.Y + 3, cf.Z)
-        print("[Wheat] Sell TP cached at " .. tostring(cf.Position))
-    else
-        print("[Wheat] Can't read sellTP CFrame")
-        sellTP = nil
-    end
+    if ok and cf then sellTP = CFrame.new(cf.X, cf.Y + 3, cf.Z) end
 else
-    print("[Wheat] No sell teleport found!")
+    print("[Wheat] No sell teleport found")
 end
 
 local function moveMouse(x, y)
@@ -199,36 +194,22 @@ end
 local function doSell()
     local root = getHRP()
     if not root or not sellTP then return end
-    root.CFrame = sellTP
+    smoothFly(root, sellTP, 0.12)
     task.wait(0.3)
     pcall(function() keypress(VK_E) end)
     task.wait(0.2)
     pcall(function() keyrelease(VK_E) end)
-    task.wait(1.5)
+    task.wait(1)
 
     local gui = player:FindFirstChild("PlayerGui")
     if not gui then return end
     local dialog = gui:FindFirstChild("DialogOptions")
     if not dialog then return end
-
-    local dialogVisible = false
-    pcall(function() dialogVisible = dialog.Visible end)
-    if not dialogVisible then
-        print("[Wheat] Dialog not visible, retrying...")
-        task.wait(1)
-        pcall(function() dialogVisible = dialog.Visible end)
-        if not dialogVisible then
-            print("[Wheat] Dialog still not visible, skipping sell")
-            return
-        end
-    end
-
     local holder = dialog:FindFirstChild("Holder")
     if not holder then return end
     local inside = holder:FindFirstChild("Inside")
     if not inside then return end
 
-    print("[Wheat] Dialog visible, looking for sell button...")
     for _, btn in ipairs(inside:GetChildren()) do
         local okName = pcall(function() return btn.Name end)
         if okName and btn.Name:lower():find("sell") then
@@ -259,7 +240,6 @@ local function doSell()
             return
         end
     end
-    print("[Wheat] No sell button found!")
 end
 
 task.spawn(function()
@@ -273,7 +253,7 @@ task.spawn(function()
                     if not ScriptActive then break end
                     local res = tonumber(farm.model:GetAttribute("ResourcesToCollect")) or 0
                     if res > 0 then
-                        root.CFrame = farm.pos
+                        smoothFly(root, farm.pos, 0.15)
                         task.wait(0.04)
                         pcall(function() keypress(VK_E) end)
                         task.wait(0.02)
@@ -283,11 +263,8 @@ task.spawn(function()
                     end
                 end
                 if sellOn and sellTP and collected > 0 then
-                    print("[Wheat] Starting sell...")
                     doSell()
                     task.wait(2)
-                elseif sellOn and not sellTP then
-                    print("[Wheat] Sell ON but no sellTP!")
                 end
                 if collected > 0 then print("[Wheat] Round:", collected .. "/" .. #cachedFarms) end
             end
