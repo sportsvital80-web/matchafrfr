@@ -148,11 +148,21 @@ local function buildFarmCache(plot)
                     if child:IsA("BasePart") then floor = child; break end
                 end
             end
+            if not floor then
+                for _, child in ipairs(model:GetDescendants()) do
+                    if child:IsA("BasePart") then floor = child; break end
+                end
+            end
             if floor then
                 local okCf, cf = pcall(function() return floor.CFrame end)
                 if okCf and cf then
                     table.insert(cachedFarms, {model = model, pos = CFrame.new(cf.X, cf.Y + 3, cf.Z), name = model.Name, res = res})
-                    print("[Wheat] Cached:", model.Name, "res:", res)
+                    print("[Wheat] Cached:", model.Name, "res:", res, "floor:", floor:GetFullName())
+                end
+            else
+                print("[Wheat] NO FLOOR:", model.Name, "#children:", #model:GetChildren())
+                for _, child in ipairs(model:GetChildren()) do
+                    print("[Wheat]   child:", child.Name, child.ClassName)
                 end
             end
         end
