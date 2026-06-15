@@ -162,27 +162,53 @@ local function scanHarvest(plot)
   end
 end
 
+local INV_MAX = 90
 local function doHarvest()
   local hrp = getHRP()
   if not hrp then return end
   if #harvestCache == 0 then return end
 
   local first = true
+  local elevated = 0
   for _, hp in ipairs(harvestCache) do
-    if not fVal("AutoHarvest") or countItems() >= sellThreshold then break end
+    if not fVal("AutoHarvest") then break end
+    local items = countItems()
+    if fVal("AutoSell") and items >= sellThreshold then break end
+    if items >= INV_MAX then break end
     if hp and hp.Parent then
       local ok, cf = pcall(function() return hp.CFrame end)
       if ok and cf then
-        hrp.CFrame = cf * CFrame.new(0, 1, 0)
+        if elevated > 0 then
+          hrp.CFrame = CFrame.new(cf.Position.X, cf.Position.Y + elevated, cf.Position.Z)
+        else
+          hrp.CFrame = cf * CFrame.new(0, 1, 0)
+        end
         if first then
           task.wait(0.5)
           keypress(VK_E)
           first = false
         end
         local waitStart = tick()
+        local lastCount = countItems()
+        local stuckAt = tick()
         while hp and hp.Parent and hp:IsDescendantOf(workspace) do
-          if not fVal("AutoHarvest") or countItems() >= sellThreshold then break end
+          if not fVal("AutoHarvest") then break end
           if tick() - waitStart > 5 then break end
+          local now = countItems()
+          if fVal("AutoSell") and now >= sellThreshold then break end
+          if now >= INV_MAX then break end
+          if now ~= lastCount then lastCount = now; stuckAt = tick() end
+          if tick() - stuckAt > 3 then
+            pcall(function() keyrelease(VK_E) end)
+            elevated = elevated + 5
+            local pos = hrp.Position
+            hrp.CFrame = CFrame.new(pos.X, pos.Y + 5, pos.Z)
+            task.wait(0.3)
+            pcall(function() keypress(VK_E) end)
+            task.wait(0.5)
+            lastCount = countItems()
+            stuckAt = tick()
+          end
           task.wait(0.05)
         end
       end
@@ -358,9 +384,14 @@ local asTh = nil
 
 local function num(t)
   if not t or type(t) ~= "string" then return 0 end
-  local k = t:match("(%d+%.?%d*)K")
+  local cleaned = t:gsub(",", "")
+  local m = cleaned:match("(%d+%.?%d*)%s*[Mm]")
+  if m then return math.floor(tonumber(m) * 1000000) end
+  local k = cleaned:match("(%d+%.?%d*)%s*[Kk]")
   if k then return math.floor(tonumber(k) * 1000) end
-  local n = t:match("%d+")
+  local b = cleaned:match("(%d+%.?%d*)%s*[Bb]")
+  if b then return math.floor(tonumber(b) * 1000000000) end
+  local n = cleaned:match("(%d+%.?%d*)")
   return n and tonumber(n) or 0
 end
 
@@ -630,7 +661,16 @@ task.spawn(function()
       elseif harvesting then
         soldCycle = false
         scanHarvest(plot); doHarvest()
-        if selling and countItems() >= 1 and not soldCycle then
+        if countItems() >= INV_MAX then
+          pcall(function() keyrelease(VK_E) end)
+          pcall(function() cam.CameraType = Enum.CameraType.Custom end)
+          local sp = plot:FindFirstChild("SpawnPoint")
+          if sp then tp(sp.CFrame * CFrame.new(0, 3, 0)) end
+          for _ = 1, 5 do
+            safeNotify("Auto Harvest done! Inventory full (100/100).", "Maybe you need to sell?", 3)
+            task.wait(0.15)
+          end
+        elseif selling and countItems() >= 1 and not soldCycle then
           pcall(function() keyrelease(VK_E) end)
           soldCycle = true
           pcall(function() cam.CameraType = Enum.CameraType.Custom end)
