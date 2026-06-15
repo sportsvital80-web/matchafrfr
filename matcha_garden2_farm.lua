@@ -54,9 +54,19 @@ local function lerpColor(a, b, t)
   return Color3.new(a.R + (b.R - a.R) * t, a.G + (b.G - a.G) * t, a.B + (b.B - a.B) * t)
 end
 
+local function haptic()
+  pcall(function()
+    local UIS = game:GetService("UserInputService")
+    UIS.HapticFeedback = Enum.HapticFeedbackType.HighFrequencyVibration
+    task.delay(0.05, function()
+      pcall(function() UIS.HapticFeedback = Enum.HapticFeedbackType.End end)
+    end)
+  end)
+end
+
 local uiPos = Vector2.new(150, 120)
-local RH = 28; local TH = 32; local AH = 2; local SH = 1; local STH = 14; local MAXS = 5
-local uiS = Vector2.new(340, TH + AH + MAXS * RH + 6 + SH + 8 + STH + 6)
+local RH = 30; local TH = 34; local AH = 2; local SH = 1; local STH = 14; local MAXS = 5
+local uiS = Vector2.new(390, TH + AH + MAXS * RH + 6 + SH + 8 + STH + 6)
 local drg, dOff, lastM1, hov, anm = false, Vector2.new(0, 0), false, 0, {}
 
 local SHD = D("Square", {Size = Vector2.new(uiS.X + 8, uiS.Y + 8), Color = C0(0,0,0), Transparency = 0.4, Filled = true, Visible = true})
@@ -66,14 +76,17 @@ local AL  = D("Square", {Size = Vector2.new(uiS.X, AH), Color = C_A, Filled = tr
 local TT  = D("Text",   {Text = "FARM HUB v2", Size = 14, Color = C_A, Outline = true, Visible = true, Font = Drawing.Fonts.System})
 local TAB_F = D("Text", {Text = "FARM", Size = 12, Color = C_A, Outline = true, Visible = true, Font = Drawing.Fonts.System})
 local TAB_P = D("Text", {Text = "PETS", Size = 12, Color = C_DM, Outline = true, Visible = true, Font = Drawing.Fonts.System})
-local SCR_U = D("Text", {Text = "▲", Size = 12, Color = C_A, Outline = true, Visible = false, Font = Drawing.Fonts.System})
-local SCR_D = D("Text", {Text = "▼", Size = 12, Color = C_A, Outline = true, Visible = false, Font = Drawing.Fonts.System})
+local TAB_S = D("Text", {Text = "SEEDS", Size = 12, Color = C_DM, Outline = true, Visible = true, Font = Drawing.Fonts.System})
+local SCR_U = D("Square", {Size = Vector2.new(3, 10), Color = C_A, Filled = true, Visible = false})
+local SCR_D = D("Square", {Size = Vector2.new(3, 10), Color = C_A, Filled = true, Visible = false})
+local SCR_B = D("Square", {Size = Vector2.new(3, 30), Color = C_A, Filled = true, Visible = false, Transparency = 0.6})
+local CLR = D("Text", {Text = "CLEAR ALL", Size = 11, Color = C_SN, Outline = true, Visible = false, Font = Drawing.Fonts.System})
 
 local SL, SC, SF = {}, {}, {}
 for i = 1, MAXS do
   SL[i] = D("Text",   {Text = "", Size = 13, Color = C_TX, Outline = true, Visible = false, Font = Drawing.Fonts.System})
-  SC[i] = D("Circle", {Radius = 8, Thickness = 2, Color = C_TO, Filled = false, Visible = false})
-  SF[i] = D("Circle", {Radius = 5, Color = C_A, Filled = true, Visible = false})
+  SC[i] = D("Circle", {Radius = 9, Thickness = 2, Color = C_TO, Filled = false, Visible = false})
+  SF[i] = D("Circle", {Radius = 6, Color = C_A, Filled = true, Visible = false})
   anm[i] = 0
 end
 local SEP = D("Square", {Size = Vector2.new(uiS.X - 24, SH), Color = C_SP, Filled = true, Visible = true})
@@ -87,9 +100,9 @@ local function feat(key, label, kind, hotkey)
 end
 
 feat("AutoHarvest", "AUTO HARVEST [1]", "toggle", 0x31)
-feat("AutoBuy",     "AUTO BUY [2]",     "toggle", 0x32)
-feat("AutoLoot",    "AUTO LOOT [3]",    "toggle", 0x33)
-feat("AutoSell",    "AUTO SELL [4]",    "toggle", 0x34)
+feat("AutoLoot",    "AUTO LOOT [2]",    "toggle", 0x32)
+feat("AutoGold",    "AUTO GOLD",        "toggle")
+feat("AutoSell",    "AUTO SELL [3]",    "toggle", 0x33)
 feat("ForceBuy",    "BUY",              "action")
 
 local function fVal(key)
@@ -186,6 +199,34 @@ local function doLoot()
   end
 end
 
+local goldCount = 0
+local function collectGold()
+  if not fVal("AutoGold") then return end
+  local gold = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("SeedPackSpawnClient") and workspace.Map.SeedPackSpawnClient:FindFirstChild("Model") and workspace.Map.SeedPackSpawnClient.Model:FindFirstChild("Gold")
+  if not gold then return end
+  local hrp = getHRP()
+  if not hrp then return end
+  local part = gold:IsA("BasePart") and gold or nil
+  if not part then
+    for _, c in ipairs(gold:GetChildren()) do
+      if c:IsA("BasePart") then part = c; break end
+    end
+  end
+  if not part then
+    local pp = gold:IsA("Model") and gold:FindFirstChild("PrimaryPart")
+    if pp then part = pp end
+  end
+  if not part then return end
+  local ok, cf = pcall(function() return part.CFrame end)
+  if ok and cf then
+    hrp.CFrame = cf * CFrame.new(0, 1, 0)
+    task.wait(0.1)
+    keypress(VK_E); task.wait(0.15); keyrelease(VK_E)
+    goldCount = goldCount + 1
+    print("[Gold] Collected #" .. goldCount)
+  end
+end
+
 local phase = "?"; local stolenCount = 0
 local function getPhase() local v = workspace:GetAttribute("ActivePhase"); if v then phase = tostring(v) end return phase end
 
@@ -195,6 +236,36 @@ local ALL_PETS = {"Frog","Bunny","Owl","Deer","Robin","Bee","Monkey","GoldenDrag
 local petSpawned = {}; local petSelected = {}; local petScroll = 0
 local ptRun = false; local ptTh = nil; local ptCount = 0; local autoPet = false
 local function petCount() local c=0; for _,v in pairs(petSelected) do if v then c=c+1 end end return c end
+
+-- Seeds
+local ALL_SEEDS = {}
+local seedSelected = {}; local seedScroll = 0
+local seedScanned = false; local autoBuy = false
+local function seedCount() local c=0; for _,v in pairs(seedSelected) do if v then c=c+1 end end return c end
+
+local function scanSeeds(fr)
+  if not fr then return end
+  local found = {}
+  for _, nm in pairs({"NormalShop", "ExclusiveShop"}) do
+    local sh = fr:FindFirstChild(nm)
+    if not sh then continue end
+    for _, it in pairs(sh:GetChildren()) do
+      if it.Name == "Sheckles_Shelf" or it.Name == "Robux_Shelf" or it.Name == "ItemTemplate" then continue end
+      local mf = it:FindFirstChild("Main_Frame")
+      if mf and mf:FindFirstChild("TextButton") then
+        table.insert(found, it.Name)
+      end
+    end
+  end
+  if #found > 0 then
+    ALL_SEEDS = found
+    seedScanned = true
+    for _, nm in ipairs(ALL_SEEDS) do
+      if seedSelected[nm] == nil then seedSelected[nm] = true end
+    end
+    print("[Seeds] Scanned " .. #ALL_SEEDS .. " seeds")
+  end
+end
 local function scanPets()
   local sp = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("WildPetSpawns")
   for _, nm in ipairs(ALL_PETS) do petSpawned[nm] = nil end
@@ -320,7 +391,7 @@ end
 
 local function scrlv(sh, it)
   pcall(function()
-    local y = sh.CanvasPosition.Y + (it.AbsolutePosition.Y - sh.AbsolutePosition.Y)
+    local y = it.AbsolutePosition.Y - sh.AbsolutePosition.Y + sh.CanvasPosition.Y
     sh.CanvasPosition = Vector2.new(0, math.max(0, y))
   end)
   task.wait(0.1)
@@ -502,9 +573,9 @@ task.spawn(function()
             while asRun and fVal("AutoSell") do task.wait(0.5) end
             asRun = false
           end
-          if fVal("AutoBuy") then
+          if autoBuy then
             abRun = true; abTh = task.spawn(autoBuyLoop)
-            while abRun and fVal("AutoBuy") do task.wait(0.5) end
+            while abRun and autoBuy do task.wait(0.5) end
           end
         else
           soldCycle = false
@@ -519,10 +590,10 @@ task.spawn(function()
           end
         end
       end
-      if fVal("AutoBuy") and not abRun and not soldCycle then
+      if autoBuy and not abRun and not soldCycle then
         abRun = true
         abTh = task.spawn(autoBuyLoop)
-      elseif not fVal("AutoBuy") and abRun then
+      elseif not autoBuy and abRun then
         abRun = false
         if abTh then task.cancel(abTh); abTh = nil end
       end
@@ -532,6 +603,7 @@ task.spawn(function()
         ptRun = false; if ptTh then task.cancel(ptTh); ptTh = nil end
       end
       if fVal("AutoLoot") then doLoot() end
+      if fVal("AutoGold") then collectGold() end
       getPhase()
     end
   end
@@ -560,19 +632,51 @@ local ActionMap = {
   ForceBuy = forceBuyNow,
 }
 
+local function renderToggle(s, x0, yy, text, on)
+  SL[s].Text = text; SL[s].Position = Vector2.new(x0 + 16, yy)
+  SL[s].Color = (hov == s) and (on and C_A or C_TX) or (on and C_A or C_DM)
+  SL[s].Visible = true
+  SC[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
+  SC[s].Color = on and C_A or C_TO; SC[s].Visible = true
+  SF[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
+  if on then anm[s] = math.min(1, anm[s] + 0.08) else anm[s] = math.max(0, anm[s] - 0.08) end
+  if anm[s] > 0.01 then
+    SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 5
+    SF[s].Color = lerpColor(C_A, C_TO, 1 - anm[s])
+  else SF[s].Visible = false end
+end
+
+local function renderListItem(s, x0, yy, nm, sel, extra, prefix)
+  SL[s].Text = (prefix or "  ") .. nm; SL[s].Position = Vector2.new(x0 + 16, yy)
+  if hov == s then SL[s].Color = sel and C_A or C_TX
+  elseif sel then SL[s].Color = extra and C_A or C_DM
+  else SL[s].Color = extra and C_TX or C_DM end
+  SL[s].Visible = true
+  SC[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
+  SC[s].Color = sel and C_A or C_TO; SC[s].Visible = true
+  SF[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
+  if sel then anm[s] = math.min(1, anm[s] + 0.08) else anm[s] = math.max(0, anm[s] - 0.08) end
+  if anm[s] > 0.01 then
+    SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 5
+    SF[s].Color = lerpColor(C_A, C_TO, 1 - anm[s])
+  else SF[s].Visible = false end
+end
+
 local function Render()
   local x0, y0 = uiPos.X, uiPos.Y
   SHD.Position = Vector2.new(x0 - 4, y0 - 4)
   BG.Position  = Vector2.new(x0, y0)
   TB.Position  = Vector2.new(x0, y0)
   AL.Position  = Vector2.new(x0, y0 + TH)
-  TT.Text = (activeTab == "farm") and "FARM HUB v2" or "PETS HUB v2"
-  TT.Position  = Vector2.new(x0 + 14, y0 + 8)
+  TT.Text = (activeTab == "farm") and "FARM HUB v2" or (activeTab == "pets") and "PETS HUB v2" or "SEEDS HUB v2"
+  TT.Position  = Vector2.new(x0 + uiS.X - TT.Text:len() * 7 - 10, y0 + 9)
 
-  TAB_F.Position = Vector2.new(x0 + uiS.X - 72, y0 + 9)
-  TAB_P.Position = Vector2.new(x0 + uiS.X - 40, y0 + 9)
+  TAB_F.Position = Vector2.new(x0 + 10, y0 + 9)
+  TAB_P.Position = Vector2.new(x0 + 50, y0 + 9)
+  TAB_S.Position = Vector2.new(x0 + 95, y0 + 9)
   TAB_F.Color = (activeTab == "farm") and C_A or C_DM
   TAB_P.Color = (activeTab == "pets") and C_A or C_DM
+  TAB_S.Color = (activeTab == "seeds") and C_A or C_DM
 
   local yy0 = y0 + TH + AH + 3
   if activeTab == "farm" then
@@ -593,12 +697,12 @@ local function Render()
       else SL[s].Color = lc end
       SL[s].Visible = true
       if f.kind == "toggle" then
-        SC[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
+        SC[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
         SC[s].Color = f.value and C_A or C_TO; SC[s].Visible = true
-        SF[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
+        SF[s].Position = Vector2.new(x0 + uiS.X - 28, yy + 8)
         if f.value then anm[s] = math.min(1, anm[s] + 0.08) else anm[s] = math.max(0, anm[s] - 0.08) end
         if anm[s] > 0.01 then
-          SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 4
+          SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 5
           SF[s].Color = lerpColor(C_A, C_TO, 1 - anm[s])
         else SF[s].Visible = false end
       else SC[s].Visible = false; SF[s].Visible = false end
@@ -607,63 +711,64 @@ local function Render()
     local hrp = getHRP()
     local yS = hrp and tostring(math.floor(hrp.Position.Y)) or "?"
     local pi = (phase == "Night") and "~" or (phase == "Day") and "#" or "?"
-    STX.Text = "Y " .. yS .. "  |  L " .. lootCount .. "  S " .. stolenCount .. "  B " .. (abRun and "ON" or "OFF") .. "  Se " .. (asRun and "ON" or "OFF") .. "  " .. pi
+    STX.Text = "Y " .. yS .. "  |  L " .. lootCount .. "  G " .. goldCount .. "  S " .. stolenCount .. "  B " .. (abRun and "ON" or "OFF") .. "  Se " .. (asRun and "ON" or "OFF") .. "  " .. pi
     STX.Position = Vector2.new(x0 + 14, y0 + uiS.Y - STH - 4)
-    SCR_U.Visible = false; SCR_D.Visible = false
-  else
-    -- pets tab: hide all slots first, then render pets
+    SCR_U.Visible = false; SCR_D.Visible = false; SCR_B.Visible = false; CLR.Visible = false
+  elseif activeTab == "pets" then
     for s = 1, MAXS do SL[s].Visible = false; SC[s].Visible = false; SF[s].Visible = false end
     for s = 1, MAXS do
       local yy = yy0 + (s - 1) * RH
       if s == 1 then
-        local on = autoPet
-        SL[s].Text = "   AUTO PET"; SL[s].Position = Vector2.new(x0 + 16, yy)
-        SL[s].Color = (hov == s) and (on and C_A or C_TX) or (on and C_A or C_DM)
-        SL[s].Visible = true
-        SC[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
-        SC[s].Color = on and C_A or C_TO; SC[s].Visible = true
-        SF[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
-        if on then anm[s] = math.min(1, anm[s] + 0.08) else anm[s] = math.max(0, anm[s] - 0.08) end
-        if anm[s] > 0.01 then
-          SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 4
-          SF[s].Color = lerpColor(C_A, C_TO, 1 - anm[s])
-        else SF[s].Visible = false end
+        renderToggle(s, x0, yy, "   AUTO PET", autoPet)
       else
         local pi = petScroll + s - 1
         local nm = ALL_PETS[pi]
-        if nm then
-          local ok2 = pcall(function()
-            local sel = petSelected[nm]; local spawned = petSpawned[nm] ~= nil
-            local prefix = spawned and "* " or "  "
-            SL[s].Text = prefix .. nm; SL[s].Position = Vector2.new(x0 + 16, yy)
-            if hov == s then
-              SL[s].Color = sel and C_A or C_TX
-            elseif sel then
-              SL[s].Color = spawned and C_A or C_DM
-            else
-              SL[s].Color = spawned and C_TX or C_DM
-            end
-            SL[s].Visible = true
-            SC[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
-            SC[s].Color = sel and C_A or C_TO; SC[s].Visible = true
-            SF[s].Position = Vector2.new(x0 + uiS.X - 26, yy + 7)
-            if sel then anm[s] = math.min(1, anm[s] + 0.08) else anm[s] = math.max(0, anm[s] - 0.08) end
-            if anm[s] > 0.01 then
-              SF[s].Visible = true; SF[s].Radius = 1 + anm[s] * 4
-              SF[s].Color = lerpColor(C_A, C_TO, 1 - anm[s])
-            else SF[s].Visible = false end
-          end)
-        end
+        if nm then renderListItem(s, x0, yy, nm, petSelected[nm] ~= false, petSpawned[nm] ~= nil, "* ") end
       end
     end
     SEP.Position = Vector2.new(x0 + 12, y0 + uiS.Y - STH - 10)
     local spawnedCount = 0; for _, v in pairs(petSpawned) do if v then spawnedCount = spawnedCount + 1 end end
     STX.Text = "Spawned: " .. spawnedCount .. "  Sel: " .. petCount() .. "  P " .. (ptRun and "ON" or "OFF")
     STX.Position = Vector2.new(x0 + 14, y0 + uiS.Y - STH - 4)
-    SCR_U.Position = Vector2.new(x0 + uiS.X - 22, y0 + TH + AH + 6)
+    SCR_U.Position = Vector2.new(x0 + uiS.X - 12, y0 + TH + AH + 8)
     SCR_U.Visible = petScroll > 0
-    SCR_D.Position = Vector2.new(x0 + uiS.X - 22, y0 + uiS.Y - STH - 24)
+    SCR_D.Position = Vector2.new(x0 + uiS.X - 12, y0 + uiS.Y - STH - 20)
     SCR_D.Visible = petScroll + 4 < #ALL_PETS
+    if #ALL_PETS > 4 then
+      local barH = math.max(10, 120 * 4 / #ALL_PETS)
+      local barY = y0 + TH + AH + 8 + (120 - barH) * (petScroll / math.max(1, #ALL_PETS - 4))
+      SCR_B.Size = Vector2.new(3, barH)
+      SCR_B.Position = Vector2.new(x0 + uiS.X - 12, barY)
+      SCR_B.Visible = true
+    else SCR_B.Visible = false end
+  elseif activeTab == "seeds" then
+    for s = 1, MAXS do SL[s].Visible = false; SC[s].Visible = false; SF[s].Visible = false end
+    for s = 1, MAXS do
+      local yy = yy0 + (s - 1) * RH
+      if s == 1 then
+        renderToggle(s, x0, yy, "   AUTO BUY", autoBuy)
+      else
+        local pi = seedScroll + s - 1
+        local nm = ALL_SEEDS[pi]
+        if nm then renderListItem(s, x0, yy, nm, seedSelected[nm] ~= false, false, "") end
+      end
+    end
+    SEP.Position = Vector2.new(x0 + 12, y0 + uiS.Y - STH - 10)
+    STX.Text = "Scanned: " .. #ALL_SEEDS .. "  Sel: " .. seedCount() .. "  B " .. (abRun and "ON" or "OFF")
+    STX.Position = Vector2.new(x0 + 14, y0 + uiS.Y - STH - 4)
+    CLR.Position = Vector2.new(x0 + uiS.X - 80, y0 + uiS.Y - STH - 3)
+    CLR.Visible = seedCount() > 0
+    SCR_U.Position = Vector2.new(x0 + uiS.X - 12, y0 + TH + AH + 8)
+    SCR_U.Visible = seedScroll > 0
+    SCR_D.Position = Vector2.new(x0 + uiS.X - 12, y0 + uiS.Y - STH - 20)
+    SCR_D.Visible = seedScroll + 4 < #ALL_SEEDS
+    if #ALL_SEEDS > 4 then
+      local barH = math.max(10, 120 * 4 / #ALL_SEEDS)
+      local barY = y0 + TH + AH + 8 + (120 - barH) * (seedScroll / math.max(1, #ALL_SEEDS - 4))
+      SCR_B.Size = Vector2.new(3, barH)
+      SCR_B.Position = Vector2.new(x0 + uiS.X - 12, barY)
+      SCR_B.Visible = true
+    else SCR_B.Visible = false end
   end
 end
 
@@ -685,18 +790,19 @@ task.spawn(function()
           local f = F[s]; local yy = yy0 + (s - 1) * RH
           if mx >= uiPos.X + 8 and mx <= uiPos.X + uiS.X - 8 and my >= yy - 4 and my <= yy + RH then
             if f.kind == "toggle" then
-              f.value = not f.value
+              f.value = not f.value; haptic()
               print("[UI] TOGGLED: " .. f.key .. " = " .. tostring(f.value))
-              safeNotify(f.label:match("^(.-)%s*%[") .. ": " .. (f.value and "ON" or "OFF"), "Toggle", 2)
+              local lname = f.label:match("^(.-)%s*%[") or f.label
+              safeNotify(lname .. ": " .. (f.value and "ON" or "OFF"), "Toggle", 2)
             elseif f.kind == "soon" then safeNotify("Coming soon!", "WIP", 2)
             elseif f.kind == "action" then
-              print("[UI] ACTION: " .. f.key)
+              print("[UI] ACTION: " .. f.key); haptic()
               local h = ActionMap[f.key]; if h then task.spawn(h) end
             end
           end
         end
       end
-    else
+    elseif activeTab == "pets" then
       for s = 1, MAXS do
         local yy = yy0 + (s - 1) * RH
         if mx >= uiPos.X + 8 and mx <= uiPos.X + uiS.X - 8 and my >= yy - 4 and my <= yy + RH then hov = s; break end
@@ -706,7 +812,7 @@ task.spawn(function()
           local yy = yy0 + (s - 1) * RH
           if mx >= uiPos.X + 8 and mx <= uiPos.X + uiS.X - 8 and my >= yy - 4 and my <= yy + RH then
             if s == 1 then
-              autoPet = not autoPet
+              autoPet = not autoPet; haptic()
               print("[UI] TOGGLED: AutoPet = " .. tostring(autoPet))
               safeNotify("AutoPet: " .. (autoPet and "ON" or "OFF"), "Toggle", 2)
               if autoPet and not ptRun then
@@ -718,13 +824,12 @@ task.spawn(function()
               local pi = petScroll + s - 1
               local nm = ALL_PETS[pi]
               if nm then
-                petSelected[nm] = not petSelected[nm]
+                petSelected[nm] = not petSelected[nm]; haptic()
                 print("[UI] Pet " .. nm .. " = " .. tostring(petSelected[nm]))
               end
             end
           end
         end
-        -- arrow clicks
         if mx >= uiPos.X + uiS.X - 30 and mx <= uiPos.X + uiS.X - 10 and my >= uiPos.Y + TH + AH + 3 and my <= uiPos.Y + TH + AH + 20 then
           if petScroll > 0 then petScroll = petScroll - 1 end
         end
@@ -732,28 +837,93 @@ task.spawn(function()
           if petScroll + 4 < #ALL_PETS then petScroll = petScroll + 1 end
         end
       end
+    elseif activeTab == "seeds" then
+      for s = 1, MAXS do
+        local yy = yy0 + (s - 1) * RH
+        if mx >= uiPos.X + 8 and mx <= uiPos.X + uiS.X - 8 and my >= yy - 4 and my <= yy + RH then hov = s; break end
+      end
+      if m1 and not lastM1 then
+        for s = 1, MAXS do
+          local yy = yy0 + (s - 1) * RH
+          if mx >= uiPos.X + 8 and mx <= uiPos.X + uiS.X - 8 and my >= yy - 4 and my <= yy + RH then
+            if s == 1 then
+              autoBuy = not autoBuy; haptic()
+              print("[UI] TOGGLED: AutoBuy = " .. tostring(autoBuy))
+              safeNotify("AutoBuy: " .. (autoBuy and "ON" or "OFF"), "Toggle", 2)
+            else
+              local pi = seedScroll + s - 1
+              local nm = ALL_SEEDS[pi]
+              if nm then
+                if seedSelected[nm] == false then seedSelected[nm] = true else seedSelected[nm] = false end; haptic()
+                print("[UI] Seed " .. nm .. " = " .. tostring(seedSelected[nm]))
+              end
+            end
+          end
+        end
+        if mx >= uiPos.X + uiS.X - 30 and mx <= uiPos.X + uiS.X - 10 and my >= uiPos.Y + TH + AH + 3 and my <= uiPos.Y + TH + AH + 20 then
+          if seedScroll > 0 then seedScroll = seedScroll - 1 end
+        end
+        if mx >= uiPos.X + uiS.X - 30 and mx <= uiPos.X + uiS.X - 10 and my >= uiPos.Y + uiS.Y - STH - 30 and my <= uiPos.Y + uiS.Y - STH - 15 then
+          if seedScroll + 4 < #ALL_SEEDS then seedScroll = seedScroll + 1 end
+        end
+        local cx = uiPos.X + uiS.X - 80; local cy = uiPos.Y + uiS.Y - STH - 3
+        if mx >= cx and mx <= cx + 70 and my >= cy - 2 and my <= cy + 14 and m1 and not lastM1 then
+          for _, k in pairs(ALL_SEEDS) do seedSelected[k] = false end; haptic()
+          print("[UI] CLEAR ALL seeds")
+          safeNotify("All seeds deselected", "Seeds", 2)
+        end
+      end
     end
 
     -- tab switch click
     if m1 and not lastM1 then
-      local tx = uiPos.X + uiS.X - 72; local ty = uiPos.Y + 9; local tabHit = false
-      if mx >= tx and mx <= tx + 30 and my >= ty - 4 and my <= ty + 14 then activeTab = "farm"; petScroll = 0; scanPets(); tabHit = true end
-      tx = uiPos.X + uiS.X - 40
-      if mx >= tx and mx <= tx + 30 and my >= ty - 4 and my <= ty + 14 then activeTab = "pets"; petScroll = 0; scanPets(); tabHit = true end
+      local tx = uiPos.X + 10; local ty = uiPos.Y + 9; local tabHit = false
+      if mx >= tx and mx <= tx + 38 and my >= ty - 4 and my <= ty + 14 then activeTab = "farm"; tabHit = true; haptic() end
+      tx = uiPos.X + 50
+      if mx >= tx and mx <= tx + 38 and my >= ty - 4 and my <= ty + 14 then activeTab = "pets"; petScroll = 0; scanPets(); tabHit = true; haptic() end
+      tx = uiPos.X + 95
+      if mx >= tx and mx <= tx + 42 and my >= ty - 4 and my <= ty + 14 then activeTab = "seeds"; seedScroll = 0; tabHit = true; haptic() end
 
       if not tabHit and mx >= uiPos.X and mx <= uiPos.X + uiS.X and my >= uiPos.Y and my <= uiPos.Y + TH then
         drg = true; dOff = Vector2.new(mx - uiPos.X, my - uiPos.Y)
       end
     end
 
-    -- pet scroll via arrow keys
+    -- pet/seed scroll via arrow keys + mouse wheel
+    local inUI = mx >= uiPos.X and mx <= uiPos.X + uiS.X and my >= uiPos.Y and my <= uiPos.Y + uiS.Y
     pcall(function()
-      if activeTab == "pets" and iskeypressed(0x28) then
-        if petScroll + 4 < #ALL_PETS then petScroll = petScroll + 1; task.wait(0.12) end
-      elseif activeTab == "pets" and iskeypressed(0x26) then
-        if petScroll > 0 then petScroll = petScroll - 1; task.wait(0.12) end
+      if activeTab == "pets" and inUI then
+        if iskeypressed(0x28) then
+          if petScroll + 4 < #ALL_PETS then petScroll = petScroll + 1; task.wait(0.12) end
+        elseif iskeypressed(0x26) then
+          if petScroll > 0 then petScroll = petScroll - 1; task.wait(0.12) end
+        end
+      elseif activeTab == "seeds" and inUI then
+        if iskeypressed(0x28) then
+          if seedScroll + 4 < #ALL_SEEDS then seedScroll = seedScroll + 1; task.wait(0.12) end
+        elseif iskeypressed(0x26) then
+          if seedScroll > 0 then seedScroll = seedScroll - 1; task.wait(0.12) end
+        end
       end
+    end)
+    pcall(function()
+      if inUI then
+        local wheel = 0
+        pcall(function() wheel = player:GetMouse().WheelForward end)
+        if wheel > 0 then
+          if activeTab == "pets" and petScroll > 0 then petScroll = petScroll - 1; haptic(); task.wait(0.1) end
+          if activeTab == "seeds" and seedScroll > 0 then seedScroll = seedScroll - 1; haptic(); task.wait(0.1) end
+        end
+        wheel = 0
+        pcall(function() wheel = player:GetMouse().WheelBackward end)
+        if wheel > 0 then
+          if activeTab == "pets" and petScroll + 4 < #ALL_PETS then petScroll = petScroll + 1; haptic(); task.wait(0.1) end
+          if activeTab == "seeds" and seedScroll + 4 < #ALL_SEEDS then seedScroll = seedScroll + 1; haptic(); task.wait(0.1) end
+        end
+      end
+    end)
 
+    pcall(function()
       for _, f in ipairs(F) do
         if f.hotkey and iskeypressed(f.hotkey) and f.kind == "toggle" and f.value then
           f.value = false
@@ -770,6 +940,7 @@ task.spawn(function()
             print("[UI] KEY ALL OFF: " .. f.key)
           end
         end
+        autoBuy = false
         safeNotify("ALL OFF (except AutoPet)", "Hotkey [5]", 2)
         task.wait(0.3)
       end
@@ -791,9 +962,9 @@ _G.MatchaCleanup = function()
   ptRun = false
   if ptTh then task.cancel(ptTh); ptTh = nil end
   pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
-  for _, obj in ipairs(drawObjs) do pcall(function() obj:Remove() end) end
+  for _, obj in ipairse(drawObjs) do pcall(function() obj:Remove() end) end
   print("[Farm] Cleanup done")
 end
 
 safeNotify("Farm loaded!", "Garden 2", 3)
-print("ready")
+print("[Farm] HARVEST + BUY + SELL + LOOT + PET ready")
