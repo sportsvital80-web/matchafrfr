@@ -323,10 +323,5 @@ _G.MatchaCleanup = function()
     for _, obj in ipairs(drawObjs) do pcall(function() obj:Remove() end) end
 end
 
-players.LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(2)
-    if ScriptActive then _G.MatchaCleanup() end
-end)
-
 safeNotify("Wheat Collector Loaded!", "Wheat", 3)
 print("[Wheat] plot:", myPlot and myPlot.Name or "NONE")
