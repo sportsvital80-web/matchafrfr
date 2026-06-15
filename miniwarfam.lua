@@ -181,34 +181,27 @@ end
 
 local function doSell()
     local root = getHRP()
-    if not root or not sellTP then print("[Wheat] No root or sellTP"); return end
-    print("[Wheat] TP to sell...")
+    if not root or not sellTP then return end
     root.CFrame = sellTP
-    task.wait(0.5)
-    pcall(function() keypress(VK_E) end)
     task.wait(0.3)
+    pcall(function() keypress(VK_E) end)
+    task.wait(0.2)
     pcall(function() keyrelease(VK_E) end)
-    print("[Wheat] Waiting for dialog...")
-    task.wait(1.5)
+    task.wait(1)
 
     local gui = player:FindFirstChild("PlayerGui")
-    if not gui then print("[Wheat] No PlayerGui"); return end
+    if not gui then return end
     local dialog = gui:FindFirstChild("DialogOptions")
-    if not dialog then print("[Wheat] No DialogOptions"); return end
+    if not dialog then return end
     local holder = dialog:FindFirstChild("Holder")
-    if not holder then print("[Wheat] No Holder"); return end
+    if not holder then return end
     local inside = holder:FindFirstChild("Inside")
-    if not inside then print("[Wheat] No Inside"); return end
-
-    print("[Wheat] Dialog found, scanning children...")
-    for _, child in ipairs(inside:GetChildren()) do
-        print("[Wheat]   child: " .. child.Name .. " (" .. child.ClassName .. ")")
-    end
+    if not inside then return end
 
     for _, btn in ipairs(inside:GetChildren()) do
         local okName = pcall(function() return btn.Name end)
         if okName and btn.Name:lower():find("sell") then
-            print("[Wheat] Clicking by name: " .. btn.Name)
+            print("[Wheat] Found sell button by name: " .. btn.Name)
             clk(btn)
             task.wait(0.5)
             return
@@ -219,7 +212,7 @@ local function doSell()
         if btn:IsA("GuiButton") then
             local ok, txt = pcall(function() return btn.Text end)
             if ok and txt and txt:lower():find("sell") then
-                print("[Wheat] Clicking by text: " .. txt)
+                print("[Wheat] Clicking: " .. txt)
                 clk(btn)
                 task.wait(0.5)
                 return
@@ -229,13 +222,12 @@ local function doSell()
 
     for _, btn in ipairs(inside:GetChildren()) do
         if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-            print("[Wheat] Clicking first button: " .. btn.Name)
+            print("[Wheat] Clicking first button in dialog")
             clk(btn)
             task.wait(0.5)
             return
         end
     end
-    print("[Wheat] No button found in dialog!")
 end
 
 task.spawn(function()
