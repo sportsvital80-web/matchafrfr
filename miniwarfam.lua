@@ -46,12 +46,11 @@ local wheatOn = false
 local sellOn = false
 
 local function smoothFly(root, target, speed)
-    speed = speed or 0.15
-    local start = root.CFrame
+    speed = speed or 0.25
     local t = 0
     while t < 1 and ScriptActive do
         t = math.min(1, t + speed)
-        root.CFrame = start:Lerp(target, t)
+        root.CFrame = root.CFrame:Lerp(target, t)
         task.wait(0.016)
     end
     root.CFrame = target
@@ -194,9 +193,9 @@ end
 local function doSell()
     local root = getHRP()
     if not root or not sellTP then return end
-    smoothFly(root, sellTP, 0.12)
-    task.wait(0.3)
-
+    smoothFly(root, sellTP, 0.25)
+    root.CFrame = sellTP
+    task.wait(0.5)
     root.CFrame = sellTP
     pcall(function() keypress(VK_E) end)
     task.wait(0.2)
@@ -266,12 +265,13 @@ task.spawn(function()
                     if not ScriptActive then break end
                     local res = tonumber(farm.model:GetAttribute("ResourcesToCollect")) or 0
                     if res > 0 then
-                        smoothFly(root, farm.pos, 0.15)
-                        task.wait(0.04)
+                        smoothFly(root, farm.pos, 0.25)
+                        root.CFrame = farm.pos
+                        task.wait(0.06)
                         pcall(function() keypress(VK_E) end)
-                        task.wait(0.02)
+                        task.wait(0.03)
                         pcall(function() keyrelease(VK_E) end)
-                        task.wait(0.04)
+                        task.wait(0.06)
                         collected = collected + 1
                     end
                 end
