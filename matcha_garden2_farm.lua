@@ -131,7 +131,15 @@ local gardens = workspace:FindFirstChild("Gardens")
 
 local function countItems()
   local ok, gui = pcall(function()
-    return player.PlayerGui:FindFirstChild("BackpackGui") and player.PlayerGui.BackpackGui:FindFirstChild("Backpack") and player.PlayerGui.BackpackGui.Backpack:FindFirstChild("Inventory") and player.PlayerGui.BackpackGui.Backpack.Inventory:FindFirstChild("ScrollingFrame") and player.PlayerGui.BackpackGui.Backpack.Inventory.ScrollingFrame:FindFirstChild("UIGridFrame")
+    local bg = player.PlayerGui:FindFirstChild("BackpackGui")
+    if not bg then return nil end
+    local bp = bg:FindFirstChild("Backpack")
+    if not bp then return nil end
+    local inv = bp:FindFirstChild("Inventory")
+    if not inv then return nil end
+    local sf = inv:FindFirstChild("ScrollingFrame")
+    if not sf then return nil end
+    return sf:FindFirstChild("UIGridFrame")
   end)
   if not ok or not gui then return 0 end
   local n = 0
@@ -142,6 +150,7 @@ local function countItems()
 end
 
 local function findPlot()
+  if not gardens then return nil end
   for _, p in ipairs(gardens:GetChildren()) do
     if tostring(p:GetAttribute("Owner")) == player.Name then return p end
   end
@@ -176,6 +185,7 @@ local function doHarvest()
     local items = countItems()
     if fVal("AutoSell") and items >= sellThreshold then break end
     if items >= INV_MAX then break end
+
     if hp and hp.Parent then
       local ok, cf = pcall(function() return hp.CFrame end)
       if ok and cf then
@@ -184,11 +194,13 @@ local function doHarvest()
         else
           hrp.CFrame = cf * CFrame.new(0, 1, 0)
         end
+
         if first then
           task.wait(0.5)
           keypress(VK_E)
           first = false
         end
+
         local waitStart = tick()
         local lastCount = countItems()
         local stuckAt = tick()
@@ -246,29 +258,37 @@ end
 local goldCount = 0
 local function collectGold()
   if not fVal("AutoGold") then return end
-  local gold = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("SeedPackSpawnClient") and workspace.Map.SeedPackSpawnClient:FindFirstChild("Model") and workspace.Map.SeedPackSpawnClient.Model:FindFirstChild("Gold")
+  local map = workspace:FindFirstChild("Map")
+  if not map then return end
+  local sp = map:FindFirstChild("SeedPackSpawnClient")
+  if not sp then return end
+  local mdl = sp:FindFirstChild("Model")
+  if not mdl then return end
+  local gold = mdl:FindFirstChild("Gold")
   if not gold then return end
+
   local hrp = getHRP()
   if not hrp then return end
+
   local part = gold:IsA("BasePart") and gold or nil
   if not part then
     for _, c in ipairs(gold:GetChildren()) do
       if c:IsA("BasePart") then part = c; break end
     end
   end
-  if not part then
-    local pp = gold:IsA("Model") and gold:FindFirstChild("PrimaryPart")
-    if pp then part = pp end
+  if not part and gold:IsA("Model") then
+    part = gold:FindFirstChild("PrimaryPart")
   end
   if not part then return end
+
   local ok, cf = pcall(function() return part.CFrame end)
-  if ok and cf then
-    hrp.CFrame = cf * CFrame.new(0, 1, 0)
-    task.wait(0.1)
-    keypress(VK_E); task.wait(1.2); keyrelease(VK_E)
-    goldCount = goldCount + 1
-    print("[Gold] Collected #" .. goldCount)
-  end
+  if not (ok and cf) then return end
+
+  hrp.CFrame = cf * CFrame.new(0, 1, 0)
+  task.wait(0.1)
+  keypress(VK_E); task.wait(1.2); keyrelease(VK_E)
+  goldCount = goldCount + 1
+  print("[Gold] Collected #" .. goldCount)
 end
 
 local phase = "?"; local stolenCount = 0
@@ -294,8 +314,7 @@ local function scanSeeds(fr)
     local sh = fr:FindFirstChild(nm)
     if sh then
       for _, it in pairs(sh:GetChildren()) do
-        local skip = false
-        if it.Name == "Sheckles_Shelf" or it.Name == "Robux_Shelf" or it.Name == "ItemTemplate" then skip = true end
+        local skip = it.Name == "Sheckles_Shelf" or it.Name == "Robux_Shelf" or it.Name == "ItemTemplate"
         if not skip then
           local mf = it:FindFirstChild("Main_Frame")
           if mf and mf:FindFirstChild("TextButton") then
@@ -305,19 +324,20 @@ local function scanSeeds(fr)
       end
     end
   end
-  if #found > 0 then
-    ALL_SEEDS = found
-    seedScanned = true
-    for _, nm in ipairs(ALL_SEEDS) do
-      if seedSelected[nm] == nil then seedSelected[nm] = true end
-    end
-    print("[Seeds] Scanned " .. #ALL_SEEDS .. " seeds")
+  if #found == 0 then return end
+
+  ALL_SEEDS = found
+  seedScanned = true
+  for _, nm in ipairs(ALL_SEEDS) do
+    if seedSelected[nm] == nil then seedSelected[nm] = true end
   end
+  print("[Seeds] Scanned " .. #ALL_SEEDS .. " seeds")
 end
 local function scanPets()
   local sp = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("WildPetSpawns")
   for _, nm in ipairs(ALL_PETS) do petSpawned[nm] = nil end
   if not sp then return end
+
   for _, inst in ipairs(sp:GetChildren()) do
     local n = inst.Name
     for _, nm in ipairs(ALL_PETS) do
@@ -330,6 +350,7 @@ local function scanPets()
       end
     end
   end
+
   for _, inst in ipairs(sp:GetChildren()) do
     if inst.ClassName ~= "Model" then
       local n = inst.Name
@@ -577,8 +598,14 @@ local function autoBuyLoop()
   while abRun do
     local fr = ouvr()
     if not abRun then break end
-    if fr then scanSeeds(fr); achtt(fr); if not abRun then break end; attRst()
-    else task.wait(5) end
+    if fr then
+      scanSeeds(fr)
+      achtt(fr)
+      if not abRun then break end
+      attRst()
+    else
+      task.wait(5)
+    end
   end
   abRun = false
   abTh = nil
@@ -618,61 +645,71 @@ local function autoSellLoop()
   safeNotify("AutoSell stopped!", "AutoSell", 3)
 end
 
+-- Anti Steal: helper functions
+local function resetCharAnchoring(hrp, anchored, platformStand)
+  pcall(function()
+    hrp.Anchored = anchored
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then humanoid.PlatformStand = platformStand end
+  end)
+end
+
+local function getAntiStealData()
+  if not fVal("AntiSteal") then return nil end
+  local p = findPlot()
+  if not p then return nil end
+  local ref = p:FindFirstChild("PlotSizeReference")
+  if not ref then return nil end
+  local hrp = getHRP()
+  if not hrp then return nil end
+  local ok, refCF = pcall(function() return ref.CFrame end)
+  if not (ok and refCF) then return nil end
+  return hrp, refCF
+end
+
+local function startSellCycle(cam, harvesting)
+  pcall(function() keyrelease(VK_E) end)
+  pcall(function() cam.CameraType = Enum.CameraType.Custom end)
+  if abRun then abRun = false; if abTh then pcall(function() task.cancel(abTh) end); abTh = nil end end
+  if not asRun then
+    asRun = true; asTh = task.spawn(autoSellLoop)
+    while asRun and fVal("AutoSell") do task.wait(0.5) end
+    asRun = false
+  end
+  if harvesting and autoBuy then
+    abRun = true; abTh = task.spawn(autoBuyLoop)
+    while abRun and autoBuy do task.wait(0.5) end
+  end
+end
+
 -- Anti Steal loop
 task.spawn(function()
   while ScriptActive do
-    if fVal("AntiSteal") then
-      local p = findPlot()
-      if p then
-        local ref = p:FindFirstChild("PlotSizeReference")
-        if ref then
-          local hrp = getHRP()
-          if hrp then
-            local ok, refCF = pcall(function() return ref.CFrame end)
-            if ok and refCF then
-              local pos = hrp.Position
-              local refPos = refCF.Position
-              local dist = (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(refPos.X, 0, refPos.Z)).Magnitude
-              if dist > 20 then
-                pcall(function()
-                  hrp.CFrame = refCF * CFrame.new(0, -3, 0)
-                  hrp.Velocity = Vector3.new(0, 0, 0)
-                  hrp.RotVelocity = Vector3.new(0, 0, 0)
-                end)
-              else
-                pcall(function()
-                  hrp.Velocity = Vector3.new(0, 0, 0)
-                  hrp.RotVelocity = Vector3.new(0, 0, 0)
-                end)
-              end
-              if not fVal("AutoHarvest") and not fVal("AutoSell") then
-                pcall(function()
-                  hrp.Anchored = true
-                  hrp.CFrame = refCF * CFrame.new(0, -3, 0)
-                  local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                  if humanoid then humanoid.PlatformStand = true end
-                end)
-              else
-                pcall(function()
-                  hrp.Anchored = false
-                  local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                  if humanoid then humanoid.PlatformStand = false end
-                end)
-              end
-            end
-          end
-        end
+    local hrp, refCF = getAntiStealData()
+    if hrp and refCF then
+      local pos = hrp.Position
+      local refPos = refCF.Position
+      local dist = (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(refPos.X, 0, refPos.Z)).Magnitude
+
+      if dist > 20 then
+        pcall(function() hrp.CFrame = refCF * CFrame.new(0, -3, 0) end)
       end
-    else
-      local hrp = getHRP()
-      if hrp then
-        pcall(function()
-          hrp.Anchored = false
-          local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-          if humanoid then humanoid.PlatformStand = false end
-        end)
+      pcall(function() hrp.Velocity = Vector3.new(0, 0, 0); hrp.RotVelocity = Vector3.new(0, 0, 0) end)
+
+      local isIdle = not fVal("AutoHarvest") and not fVal("AutoSell")
+      if isIdle then
+        resetCharAnchoring(hrp, true, true)
+        pcall(function() hrp.CFrame = refCF * CFrame.new(0, -3, 0) end)
+      else
+        resetCharAnchoring(hrp, false, false)
       end
     end
+
+    if not fVal("AntiSteal") then
+      local hrp2 = getHRP()
+      if hrp2 then resetCharAnchoring(hrp2, false, false) end
+    end
+
     task.wait(0.1)
   end
 end)
@@ -691,6 +728,7 @@ task.spawn(function()
   local prevHarvest = false
   local cam = workspace.CurrentCamera
   local soldCycle = false
+
   while ScriptActive do
     local harvesting = fVal("AutoHarvest")
     local selling = fVal("AutoSell")
@@ -703,6 +741,7 @@ task.spawn(function()
       if prevHarvest then pcall(function() cam.CameraType = Enum.CameraType.Custom end) end
       task.wait(0.5)
     end
+
     if not plot or not plot.Parent then plot = findPlot() end
     if plot then
       if prevHarvest and not harvesting then
@@ -713,24 +752,19 @@ task.spawn(function()
       prevHarvest = harvesting
 
       local items = countItems()
+
       if selling and items >= 1 and not soldCycle then
-        pcall(function() keyrelease(VK_E) end)
         soldCycle = true
-        pcall(function() cam.CameraType = Enum.CameraType.Custom end)
-        if abRun then abRun = false; if abTh then pcall(function() task.cancel(abTh) end); abTh = nil end end
-        if not asRun then
-          asRun = true; asTh = task.spawn(autoSellLoop)
-          while asRun and fVal("AutoSell") do task.wait(0.5) end
-          asRun = false
-        end
-        if harvesting and autoBuy then
-          abRun = true; abTh = task.spawn(autoBuyLoop)
-          while abRun and autoBuy do task.wait(0.5) end
-        end
+        startSellCycle(cam, harvesting)
+        soldCycle = false
+
       elseif harvesting then
         soldCycle = false
-        scanHarvest(plot); doHarvest()
-        if countItems() >= INV_MAX then
+        scanHarvest(plot)
+        doHarvest()
+        items = countItems()
+
+        if items >= INV_MAX then
           pcall(function() keyrelease(VK_E) end)
           pcall(function() cam.CameraType = Enum.CameraType.Custom end)
           local sp = plot:FindFirstChild("SpawnPoint")
@@ -739,21 +773,13 @@ task.spawn(function()
             safeNotify("Auto Harvest done! Inventory full (100/100).", "Maybe you need to sell?", 3)
             task.wait(0.15)
           end
-        elseif selling and countItems() >= 1 and not soldCycle then
-          pcall(function() keyrelease(VK_E) end)
+
+        elseif selling and items >= 1 and not soldCycle then
           soldCycle = true
-          pcall(function() cam.CameraType = Enum.CameraType.Custom end)
-          if abRun then abRun = false; if abTh then pcall(function() task.cancel(abTh) end); abTh = nil end end
-          if not asRun then
-            asRun = true; asTh = task.spawn(autoSellLoop)
-            while asRun and fVal("AutoSell") do task.wait(0.5) end
-            asRun = false
-          end
-          if harvesting and autoBuy then
-            abRun = true; abTh = task.spawn(autoBuyLoop)
-            while abRun and autoBuy do task.wait(0.5) end
-          end
+          startSellCycle(cam, harvesting)
+          soldCycle = false
         end
+
         hCyc = hCyc + 1
         if hCyc >= MCYC and RSRC then
           print("[Farm] Auto-restart after " .. hCyc .. " cycles")
@@ -763,18 +789,20 @@ task.spawn(function()
           return
         end
       end
+
       if autoBuy and not abRun and not soldCycle then
         abRun = true
         abTh = task.spawn(autoBuyLoop)
       elseif not autoBuy and abRun then
-        abRun = false
-        if abTh then pcall(function() task.cancel(abTh) end); abTh = nil end
+        abRun = false; if abTh then pcall(function() task.cancel(abTh) end); abTh = nil end
       end
+
       if autoPet and not ptRun then
         scanPets(); ptRun = true; ptTh = task.spawn(petBuyLoop)
       elseif not autoPet and ptRun then
         ptRun = false; if ptTh then pcall(function() task.cancel(ptTh) end); ptTh = nil end
       end
+
       if fVal("AutoLoot") then doLoot() end
       if fVal("AutoGold") then collectGold() end
       getPhase()
