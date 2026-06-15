@@ -471,30 +471,29 @@ local function achtt(fr)
         rScrl(sh); task.wait(0.2)
         for _, it in pairs(sh:GetChildren()) do
           if not abRun then ferm(fr); return tot end
-          local skip = false
-          if it.Name == "Sheckles_Shelf" or it.Name == "Robux_Shelf" or it.Name == "ItemTemplate" then skip = true end
-          if seedSelected[it.Name] == false then skip = true end
-          if not skip then
+          if it.Name ~= "Sheckles_Shelf" and it.Name ~= "Robux_Shelf" and it.Name ~= "ItemTemplate" then
             local mf = it:FindFirstChild("Main_Frame")
             if mf then
               local sb = mf:FindFirstChild("TextButton")
               if sb then
-                scrlv(sh, it); clk(sb); task.wait(0.5)
+                clk(sb); task.wait(0.5)
                 if not abRun then ferm(fr); return tot end
-                local px, sk = prix(mf), stk(mf)
-                if px > 0 and sk > 0 then
-                  if coins() < px then ferm(fr); safeNotify("Not enough coins! " .. tot .. " seeds bought.", "AutoBuy", 5); return tot end
-                  for _ = 1, sk do
-                    if not abRun then ferm(fr); return tot end
+                if seedSelected[it.Name] ~= false then
+                  local px, sk = prix(mf), stk(mf)
+                  if px > 0 and sk > 0 then
                     if coins() < px then ferm(fr); safeNotify("Not enough coins! " .. tot .. " seeds bought.", "AutoBuy", 5); return tot end
-                    local bp, bs = bb.AbsolutePosition, bb.AbsoluteSize
-                    moveMouse(bp.X + bs.X / 2, bp.Y + bs.Y / 2 + 10)
-                    task.wait(0.05); mouse1click(); task.wait(0.15)
-                    tot = tot + 1
+                    for _ = 1, sk do
+                      if not abRun then ferm(fr); return tot end
+                      if coins() < px then ferm(fr); safeNotify("Not enough coins! " .. tot .. " seeds bought.", "AutoBuy", 5); return tot end
+                      local bp, bs = bb.AbsolutePosition, bb.AbsoluteSize
+                      moveMouse(bp.X + bs.X / 2, bp.Y + bs.Y / 2 + 10)
+                      task.wait(0.05); mouse1click(); task.wait(0.15)
+                      tot = tot + 1
+                    end
+                    task.wait(0.2)
+                  else
+                    task.wait(0.15)
                   end
-                  task.wait(0.2)
-                else
-                  task.wait(0.15)
                 end
               end
             end
@@ -836,7 +835,7 @@ local function Render()
     for s = 1, MAXS do
       local yy = yy0 + (s - 1) * RH
       if s == 1 then
-        renderToggle(s, x0, yy, "   AUTO BUY(WORK IN PROGRESS TOGGLES ARE BROKEN ATM", autoBuy)
+        renderToggle(s, x0, yy, "   AUTO BUY", autoBuy)
       else
         local pi = seedScroll + s - 1
         local nm = ALL_SEEDS[pi]
