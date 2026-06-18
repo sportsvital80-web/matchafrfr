@@ -124,9 +124,10 @@ local function isFatigueMaxed()
   return false
 end
 
-local function isFatigueNearMax()
+local function isFatigueEmpty()
   local cur, mx = getFatigue()
-  if cur and mx and cur >= mx - 1 and cur > 0 then return true end
+  if cur == nil then return false end
+  if cur == 0 then return true end
   return false
 end
 
@@ -161,42 +162,16 @@ local function gymClick()
 end
 
 local function gymLoop()
-  local lastStuckCheck = 0
   while gymRun do
     if isFatigueMaxed() then
-      while gymRun do
-        task.wait(0.2)
-        local cur, mx = getFatigue()
-        if cur == nil or (cur == 0) then break end
-        if cur < mx then break end
+      while gymRun and not isFatigueEmpty() do
+        task.wait(0.1)
       end
     end
     local btn = getGymBtn()
     if btn then
       gymClick()
       gymCount = gymCount + 1
-      local now = tick()
-      if isFatigueNearMax() and btn and (now - lastStuckCheck) > 3 then
-        lastStuckCheck = now
-        local p1 = btn.AbsolutePosition
-        task.wait(1)
-        if btn then
-          local p2 = btn.AbsolutePosition
-          if p1 and p2 and math.abs(p2.X - p1.X) < 1 and math.abs(p2.Y - p1.Y) < 1 then
-            while gymRun do
-              task.wait(0.2)
-              local b = getGymBtn()
-              if not b then break end
-              local pp1 = b.AbsolutePosition
-              task.wait(0.5)
-              local pp2 = b.AbsolutePosition
-              if pp1 and pp2 and (math.abs(pp2.X - pp1.X) > 1 or math.abs(pp2.Y - pp1.Y) > 1) then
-                break
-              end
-            end
-          end
-        end
-      end
     end
     task.wait(0.02)
   end
@@ -224,14 +199,10 @@ local curlUseUp = true
 
 local function autoCurlLoop()
   curlLocked = false
-  local lastStuckCheck = 0
   while curlRun do
     if isFatigueMaxed() then
-      while curlRun do
-        task.wait(0.2)
-        local cur, mx = getFatigue()
-        if cur == nil or (cur == 0) then break end
-        if cur < mx then break end
+      while curlRun and not isFatigueEmpty() do
+        task.wait(0.1)
       end
     end
     local btn = getCurlBtn()
@@ -260,28 +231,6 @@ local function autoCurlLoop()
         task.wait(0.02)
         mouse1release()
         curlCount = curlCount + 1
-        local now = tick()
-        if isFatigueNearMax() and (now - lastStuckCheck) > 3 then
-          lastStuckCheck = now
-          local pp = btn.AbsolutePosition
-          task.wait(1)
-          if btn then
-            local pp2 = btn.AbsolutePosition
-            if pp and pp2 and math.abs(pp2.X - pp.X) < 1 and math.abs(pp2.Y - pp.Y) < 1 then
-              while curlRun do
-                task.wait(0.2)
-                local b = getCurlBtn()
-                if not b then break end
-                local pp1 = b.AbsolutePosition
-                task.wait(0.5)
-                local pp3 = b.AbsolutePosition
-                if pp1 and pp3 and (math.abs(pp3.X - pp1.X) > 1 or math.abs(pp3.Y - pp1.Y) > 1) then
-                  break
-                end
-              end
-            end
-          end
-        end
       end
       task.wait(0.05)
     else
