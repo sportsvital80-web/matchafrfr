@@ -98,37 +98,40 @@ local function moveMouseSlow(x, y)
 end
 
 -- FATIGUE CHECK
-local function getFatigue()
+local function getFatigueMax()
   local lp = players.LocalPlayer
-  if not lp then return nil, nil end
+  if not lp then return nil end
   local pg = lp:FindFirstChild("PlayerGui")
-  if not pg then return nil, nil end
+  if not pg then return nil end
   local fatigue = pg:FindFirstChild("Fatigue")
-  if not fatigue then return nil, nil end
+  if not fatigue then return nil end
   local prog = fatigue:FindFirstChild("Progress")
-  if not prog then return nil, nil end
+  if not prog then return nil end
   local txt = prog:FindFirstChild("ProgressionText")
-  if not txt then return nil, nil end
+  if not txt then return nil end
   local val = txt.Text
-  if not val or val == "" then return nil, nil end
-  local cur, mx = val:match("(%d+)/(%d+)")
-  if cur and mx then
-    return tonumber(cur), tonumber(mx)
-  end
-  return nil, nil
+  if not val or val == "" then return nil end
+  local _, mx = val:match("(%d+)/(%d+)")
+  if mx then return tonumber(mx) end
+  return nil
 end
 
-local function isFatigueMaxed()
-  local cur, mx = getFatigue()
-  if cur and mx and cur >= mx then return true end
-  return false
-end
-
-local function isFatigueEmpty()
-  local cur, mx = getFatigue()
-  if cur == nil then return false end
-  if cur == 0 then return true end
-  return false
+local function getFatigueCur()
+  local lp = players.LocalPlayer
+  if not lp then return nil end
+  local pg = lp:FindFirstChild("PlayerGui")
+  if not pg then return nil end
+  local fatigue = pg:FindFirstChild("Fatigue")
+  if not fatigue then return nil end
+  local prog = fatigue:FindFirstChild("Progress")
+  if not prog then return nil end
+  local txt = prog:FindFirstChild("ProgressionText")
+  if not txt then return nil end
+  local val = txt.Text
+  if not val or val == "" then return nil end
+  local cur = val:match("(%d+)/(%d+)")
+  if cur then return tonumber(cur) end
+  return nil
 end
 
 -- GYM
@@ -162,16 +165,33 @@ local function gymClick()
 end
 
 local function gymLoop()
+  local repCount = 0
+  local maxReps = getFatigueMax() or 99
+  local origPos = nil
   while gymRun do
-    if isFatigueMaxed() then
-      while gymRun and not isFatigueEmpty() do
-        task.wait(0.1)
+    if repCount >= maxReps then
+      while gymRun do
+        task.wait(0.2)
+        local cur = getFatigueCur()
+        if cur == nil or cur == 0 then break end
       end
+      repCount = 0
+      origPos = nil
+      maxReps = getFatigueMax() or 99
     end
     local btn = getGymBtn()
     if btn then
-      gymClick()
-      gymCount = gymCount + 1
+      local p = btn.AbsolutePosition
+      if p then
+        if not origPos then
+          origPos = Vector2.new(p.X, p.Y)
+        end
+        if math.abs(p.X - origPos.X) < 1 and math.abs(p.Y - origPos.Y) < 1 then
+          repCount = repCount + 1
+          gymClick()
+          gymCount = gymCount + 1
+        end
+      end
     end
     task.wait(0.02)
   end
@@ -199,11 +219,19 @@ local curlUseUp = true
 
 local function autoCurlLoop()
   curlLocked = false
+  local repCount = 0
+  local maxReps = getFatigueMax() or 99
+  local origPos = nil
   while curlRun do
-    if isFatigueMaxed() then
-      while curlRun and not isFatigueEmpty() do
-        task.wait(0.1)
+    if repCount >= maxReps then
+      while curlRun do
+        task.wait(0.2)
+        local cur = getFatigueCur()
+        if cur == nil or cur == 0 then break end
       end
+      repCount = 0
+      origPos = nil
+      maxReps = getFatigueMax() or 99
     end
     local btn = getCurlBtn()
     if btn then
@@ -211,26 +239,32 @@ local function autoCurlLoop()
       if p and s then
         local cx = p.X + s.X / 2
         local cy = p.Y + s.Y / 2
-        if not curlLocked then
-          curlUseUp = cy > 500
-          curlLocked = true
+        if not origPos then
+          origPos = Vector2.new(cx, cy)
         end
-        local angle = curlUseUp and CURL_ANGLE_UP or CURL_ANGLE_DOWN
-        local ySign = curlUseUp and -1 or 1
-        moveMouseSlow(cx, cy)
-        task.wait(0.02)
-        mouse1press()
-        for i = 1, CURL_STEPS do
-          if not curlRun then break end
-          local t = i / CURL_STEPS
-          local nx = cx + math.cos(angle) * CURL_DIST * t
-          local ny = cy + ySign * math.abs(math.sin(angle)) * CURL_DIST * t
-          mousemoveabs(nx, ny)
-          task.wait(0.008)
+        if math.abs(cx - origPos.X) < 1 and math.abs(cy - origPos.Y) < 1 then
+          repCount = repCount + 1
+          if not curlLocked then
+            curlUseUp = cy > 500
+            curlLocked = true
+          end
+          local angle = curlUseUp and CURL_ANGLE_UP or CURL_ANGLE_DOWN
+          local ySign = curlUseUp and -1 or 1
+          moveMouseSlow(cx, cy)
+          task.wait(0.02)
+          mouse1press()
+          for i = 1, CURL_STEPS do
+            if not curlRun then break end
+            local t = i / CURL_STEPS
+            local nx = cx + math.cos(angle) * CURL_DIST * t
+            local ny = cy + ySign * math.abs(math.sin(angle)) * CURL_DIST * t
+            mousemoveabs(nx, ny)
+            task.wait(0.008)
+          end
+          task.wait(0.02)
+          mouse1release()
+          curlCount = curlCount + 1
         end
-        task.wait(0.02)
-        mouse1release()
-        curlCount = curlCount + 1
       end
       task.wait(0.05)
     else
