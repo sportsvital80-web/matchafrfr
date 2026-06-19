@@ -154,27 +154,6 @@ local function findPlot()
   for _, p in ipairs(gardens:GetChildren()) do
     if tostring(p:GetAttribute("Owner")) == player.Name then return p end
   end
-  -- Fallback: teleport via GardenButton then find closest SpawnPoint
-  local hrp = getHRP()
-  if not hrp then return nil end
-  local ok, gb = pcall(function() return player.PlayerGui.TeleportButtons.TeleportButtons.GardenButton end)
-  if ok and gb then
-    pcall(function() clk(gb) end); task.wait(0.5)
-    local pos = hrp.Position
-    local closest, bestDist = nil, math.huge
-    for _, p in ipairs(gardens:GetChildren()) do
-      local sp = p:FindFirstChild("SpawnPoint")
-      if sp then
-        local ok, cf = pcall(function() return sp.CFrame end)
-        if ok and cf then
-          local d = (pos - cf.Position).Magnitude
-          if d < bestDist then bestDist = d; closest = p end
-        end
-      end
-    end
-    return closest
-  end
-  return nil
 end
 
 local function tp(cf) local h = getHRP(); if h then h.CFrame = cf end end
